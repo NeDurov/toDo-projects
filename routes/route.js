@@ -11,18 +11,17 @@ const Stack = createNativeStackNavigator();
 export default function Routers() {
 	return (
 		<NavigationContainer>
-			<Stack.Navigator>
-				<Stack.Screen
-					name="Auth"
-					component={Auth}
-					options={{ title: "Выполните вход" }}
-				/>
+			<Stack.Navigator
+				screenOptions={{
+					headerShown: false,
+				}}
+			>
+				<Stack.Screen name="Auth" component={Auth} />
 				<Stack.Screen
 					name="ToDoList"
 					component={ToDoList}
 					options={{ title: "Список дел" }}
 				/>
-				
 			</Stack.Navigator>
 		</NavigationContainer>
 	);

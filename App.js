@@ -1,8 +1,5 @@
-import { View } from 'react-native';
-import Routers from './routes/route'
+import Routers from "./routes/route";
 
 export default function App() {
-	return (
-		<Routers/>
-	);
+	return <Routers />;
 }
