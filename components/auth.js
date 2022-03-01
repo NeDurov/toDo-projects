@@ -1,24 +1,42 @@
 import React, { useState, useRef, useEffect } from "react";
-import { TextInput, View, Animated, Text, SafeAreaView } from "react-native";
+import {
+	TextInput,
+	Button,
+	Animated,
+	Text,
+	SafeAreaView,
+	Alert,
+} from "react-native";
+import * as Notifications from "expo-notifications";
+import Constants from "expo-constants";
+
+Notifications.setNotificationHandler({
+	handleNotification: async () => ({
+		shouldShowAlert: true,
+		shouldPlaySound: true,
+		shouldSetBadge: false,
+	}),
+});
 
 export default function Auth({ navigation }) {
+	const [expoPushToken, setExpoPushToken] = useState("");
+	const [notification, setNotification] = useState(false);
+
+	//Notification
+	const notificationListener = useRef();
+	const responseListener = useRef();
+
 	const [phoneNumber, setPhoneNumber] = useState("");
+	const [visibleButtonSend, setVisibleButtonSend] = useState(true);
 
 	const fadeAnimWriteYourPhonePlease = useRef(new Animated.Value(0)).current;
-	const fadeIn = () => {
-		// Will change fadeAnim value to 1 in 5 seconds
+	const fadeWriteYourPhonePlease = () => {
 		Animated.timing(fadeAnimWriteYourPhonePlease, {
 			toValue: 1,
 			duration: 5000,
 			useNativeDriver: true,
 		}).start();
 	};
-	useEffect(() => {
-		fadeIn();
-		moveAuth();
-		moveWorkspace();
-		moveNumber();
-	}, []);
 
 	const moveAnimationAuth = useRef(new Animated.Value(-180)).current;
 	const moveAuth = () => {
@@ -47,9 +65,92 @@ export default function Auth({ navigation }) {
 		}).start();
 	};
 
+	useEffect(() => {
+		setVisibleButtonSend(phoneNumber.length === 16 ? false : true);
+	}, [phoneNumber]);
+
+	useEffect(() => {
+		fadeWriteYourPhonePlease();
+		moveAuth();
+		moveWorkspace();
+		moveNumber();
+
+		//Notification
+		registerForPushNotificationsAsync().then((token) =>
+			setExpoPushToken(token)
+		);
+
+		notificationListener.current =
+			Notifications.addNotificationReceivedListener((notification) => {
+				setNotification(notification);
+			});
+
+		responseListener.current =
+			Notifications.addNotificationResponseReceivedListener((response) => {
+				console.log(response);
+			});
+
+		return () => {
+			Notifications.removeNotificationSubscription(
+				notificationListener.current
+			);
+			Notifications.removeNotificationSubscription(responseListener.current);
+		};
+	}, []);
+
+	//Notification
+	async function registerForPushNotificationsAsync() {
+		let token;
+		if (Constants.isDevice) {
+			const { status: existingStatus } =
+				await Notifications.getPermissionsAsync();
+			let finalStatus = existingStatus;
+			if (existingStatus !== "granted") {
+				const { status } = await Notifications.requestPermissionsAsync();
+				finalStatus = status;
+			}
+			if (finalStatus !== "granted") {
+				alert("Failed to get push token for push notification!");
+				return;
+			}
+			token = (await Notifications.getExpoPushTokenAsync()).data;
+			console.log(token);
+		} else {
+			alert("Must use physical device for Push Notifications");
+		}
+
+		if (Platform.OS === "android") {
+			Notifications.setNotificationChannelAsync("default", {
+				name: "default",
+				importance: Notifications.AndroidImportance.MAX,
+				vibrationPattern: [0, 250, 250, 250],
+				lightColor: "#FF231F7C",
+			});
+		}
+
+		return token;
+	}
+
+	const sendCode = (token) => {
+		fetch("https://exp.host/--/api/v2/push/send", {
+			method: "POST",
+			headers: {
+				Accept: "application/json",
+				"Accept-encoding": "gzip, deflate",
+				"Content-type": "application/json",
+			},
+			body: JSON.stringify({
+				to: token,
+				sound: "default",
+				title: "Цифровое рабочее место",
+				body: `Ваш код для авторизации: ${1234}`,
+			}),
+		});
+	};
+
 	const setNormalizePhoneNumber = function (text) {
 		if (phoneNumber.length < text.length) {
-			number = text[text.length - 1];
+			let number = text[text.length - 1];
 			let normalizeCounter = phoneNumber.length;
 			switch (normalizeCounter) {
 				case 0:
@@ -123,6 +224,21 @@ export default function Auth({ navigation }) {
 					keyboardType="numeric"
 					maxLength={16}
 					textContentType="telephoneNumber"
+				/>
+			</Animated.View>
+			<Animated.View
+				style={{
+					marginEnd: 30,
+					marginTop: 50,
+					opacity: fadeAnimWriteYourPhonePlease,
+				}}
+			>
+				<Button
+					disabled={visibleButtonSend}
+					title="Выслать код"
+					onPress={() => {
+						sendCode(expoPushToken);
+					}}
 				/>
 			</Animated.View>
 		</SafeAreaView>
