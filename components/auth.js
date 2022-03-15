@@ -9,7 +9,9 @@ import {
 } from "react-native";
 import * as Notifications from "expo-notifications";
 import Constants from "expo-constants";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
+//Notification
 Notifications.setNotificationHandler({
 	handleNotification: async () => ({
 		shouldShowAlert: true,
@@ -19,6 +21,8 @@ Notifications.setNotificationHandler({
 });
 
 export default function Auth({ navigation }) {
+	const [user, setUser] = useState("");
+
 	const [expoPushToken, setExpoPushToken] = useState("");
 	const [notification, setNotification] = useState(false);
 
@@ -74,6 +78,7 @@ export default function Auth({ navigation }) {
 		moveAuth();
 		moveWorkspace();
 		moveNumber();
+		readUser();
 
 		//Notification
 		registerForPushNotificationsAsync().then((token) =>
@@ -98,6 +103,21 @@ export default function Auth({ navigation }) {
 		};
 	}, []);
 
+	// user
+	async function readUser() {
+		const userParams = await AsyncStorage.getItem("user");
+
+		if (userParams) {
+			await setUser(userParams);
+		}
+	}
+	async function authUser() {
+		const _id = Math.random().toString(36).substring(7);
+		const userParams = { _id, phoneNumber };
+		await AsyncStorage.setItem("user", JSON.stringify(userParams));
+		setUser(userParams);
+	}
+
 	//Notification
 	async function registerForPushNotificationsAsync() {
 		let token;
@@ -114,7 +134,7 @@ export default function Auth({ navigation }) {
 				return;
 			}
 			token = (await Notifications.getExpoPushTokenAsync()).data;
-			console.log(token);
+			// console.log(token);
 		} else {
 			alert("Must use physical device for Push Notifications");
 		}
@@ -171,76 +191,117 @@ export default function Auth({ navigation }) {
 			setPhoneNumber(text);
 		}
 	};
-	return (
-		<SafeAreaView style={{ marginStart: 30, marginVertical: 60 }}>
-			<Animated.Text
-				style={{
-					fontSize: 30,
-					transform: [{ translateX: moveAnimationAuth }],
-				}}
-			>
-				{"Авторизация"}
-			</Animated.Text>
-			<Animated.Text
-				style={{
-					fontSize: 50,
-					fontWeight: "bold",
-					transform: [{ translateX: moveAnimationWorkspace }],
-				}}
-			>
-				{"Цифровое рабочее место"}
-			</Animated.Text>
-			<Animated.Text
-				style={{
-					fontSize: 20,
-					marginTop: 40,
-					color: "#808080",
-					opacity: fadeAnimWriteYourPhonePlease,
-				}}
-			>
-				{"Введите Ваш номер телефона"}
-			</Animated.Text>
-			<Animated.View
-				style={{
-					marginTop: 60,
-					flexDirection: "row",
-					transform: [{ translateY: moveAnimationNumber }],
-				}}
-			>
-				<Text
+	if (!user) {
+		return (
+			<SafeAreaView style={{ marginStart: 30, marginVertical: 60 }}>
+				<Animated.Text
 					style={{
-						fontSize: 40,
+						fontSize: 30,
+						transform: [{ translateX: moveAnimationAuth }],
 					}}
 				>
-					{"+7"}
-				</Text>
-				<TextInput
+					{"Авторизация"}
+				</Animated.Text>
+				<Animated.Text
 					style={{
-						fontSize: 40,
+						fontSize: 50,
+						fontWeight: "bold",
+						transform: [{ translateX: moveAnimationWorkspace }],
 					}}
-					value={phoneNumber}
-					onChangeText={(text) => setNormalizePhoneNumber(text)}
-					placeholder=" (999) 999-99-99"
-					keyboardType="numeric"
-					maxLength={16}
-					textContentType="telephoneNumber"
-				/>
-			</Animated.View>
-			<Animated.View
+				>
+					{"Цифровое рабочее место"}
+				</Animated.Text>
+				<Animated.Text
+					style={{
+						fontSize: 20,
+						marginTop: 40,
+						color: "#808080",
+						opacity: fadeAnimWriteYourPhonePlease,
+					}}
+				>
+					{"Введите Ваш номер телефона"}
+				</Animated.Text>
+				<Animated.View
+					style={{
+						marginTop: 60,
+						flexDirection: "row",
+						transform: [{ translateY: moveAnimationNumber }],
+					}}
+				>
+					<Text
+						style={{
+							fontSize: 40,
+						}}
+					>
+						{"+7"}
+					</Text>
+					<TextInput
+						style={{
+							fontSize: 40,
+						}}
+						value={phoneNumber}
+						onChangeText={(text) => setNormalizePhoneNumber(text)}
+						placeholder=" (999) 999-99-99"
+						keyboardType="numeric"
+						maxLength={16}
+						textContentType="telephoneNumber"
+					/>
+				</Animated.View>
+				<Animated.View
+					style={{
+						marginEnd: 30,
+						marginTop: 50,
+						opacity: fadeAnimWriteYourPhonePlease,
+					}}
+				>
+					<Button
+						disabled={visibleButtonSend}
+						title="Выслать код"
+						onPress={() => {
+							sendCode(expoPushToken);
+							// KeyEvent.onKeyUpListener((keyEvent) => {
+							// 	setCodeFromNotifi(codeFromNotifi + 1);
+							// });
+							Alert.prompt(
+								"Введите код проверки",
+								"Сообщение с кодом проверки отправлено на Ваш номер телефона. Введите код чтобы продолжить",
+
+								[
+									{
+										text: "Подтвердить",
+										onPress: async () => {
+											await authUser();
+
+											navigation.navigate("ToDoList");
+										},
+									},
+									{ text: "Отменить", onPress: () => {} },
+								],
+								"plain-text"
+							);
+						}}
+					/>
+				</Animated.View>
+			</SafeAreaView>
+		);
+	} else {
+		return (
+			<SafeAreaView
 				style={{
-					marginEnd: 30,
-					marginTop: 50,
-					opacity: fadeAnimWriteYourPhonePlease,
+					alignItems: "center",
+					justifyContent: "center",
+					height: "100%",
 				}}
 			>
 				<Button
-					disabled={visibleButtonSend}
-					title="Выслать код"
+					title="Сменить пользователя?"
 					onPress={() => {
-						sendCode(expoPushToken);
+						AsyncStorage.removeItem("user");
+						setPhoneNumber("");
+						setUser(null);
 					}}
-				/>
-			</Animated.View>
-		</SafeAreaView>
-	);
+				></Button>
+			</SafeAreaView>
+		);
+	}
 }
